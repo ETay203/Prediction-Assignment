@@ -1,7 +1,7 @@
 ---
-title: "Prediction_Assignment"
+title: "Weight Lifting Prediction Assignment"
 author: "ETaylor"
-date: "1 March 2018"
+date: "9 March 2018"
 output:
   html_document: default
   word_document: default
@@ -19,10 +19,6 @@ The aim of this project is to use a dataset that recorded six participents perfo
 The participents were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Data was recorded by four wearable sensors (accelerometers) on the belt, forearm, arm, and dumbell of each of the participants. This project will use machine learning, building a model to classify each mistake. 
 
 This report details how the prediction model was built, how cross validation was used, the expected out of sample error, and why various choices were made. 
-
-#Peer Review Portion
-Your submission for the Peer Review portion should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
-
 
 #Weight Lifting Exercises Dataset
 In this project we use the Weight Lifting Exercises dataset to build a model that predicts "how (well)" an activity was performed by the wearer. In other words we want to develop an automatic and robust detection of execution mistakes. This data records the measurements taken by on-body sensors.  
