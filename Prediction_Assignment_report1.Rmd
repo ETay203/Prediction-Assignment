@@ -1,0 +1,158 @@
+---
+title: "Prediction_Assignment"
+author: "ETaylor"
+date: "1 March 2018"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify *how well* they do it. 
+
+The aim of this project is to use a dataset that recorded six participents performing a weight lifting excercise to predict the manner (how well) in which they did the exercise. 
+
+The participents were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Data was recorded by four wearable sensors (accelerometers) on the belt, forearm, arm, and dumbell of each of the participants. This project will use machine learning, building a model to classify each mistake. 
+
+This report details how the prediction model was built, how cross validation was used, the expected out of sample error, and why various choices were made. 
+
+#Peer Review Portion
+Your submission for the Peer Review portion should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+
+
+#Weight Lifting Exercises Dataset
+In this project we use the Weight Lifting Exercises dataset to build a model that predicts "how (well)" an activity was performed by the wearer. In other words we want to develop an automatic and robust detection of execution mistakes. This data records the measurements taken by on-body sensors.  
+Six participants were recorded perfoming one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification - i.e correctly (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. All participants could easily simulate the mistakes in a safe and controlled manner by using a relatively light dumbbell (1.25kg).
+
+More information about the data used in this project is available from the website: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset) and <http://groupware.les.inf.puc-rio.br/har#ixzz58UfXsime>. The original paper where the recording and application of this data is described is given in the citation at the end of this report [1].
+
+##Training and testing datasets
+For this project the data has been given in two sets, a training set (pml_training.csv) and testing set (pml_testing.csv). The training data was used to build the model as well as for cross-validation and calculating the out of sample error.  The prediction model will then be used to predict 20 different test cases given in the testing set.
+
+The training data for this project are available here: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+
+The test data are available here: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+```{r warning = FALSE, message = F}
+library(readr)
+pml_training <- read_csv("pml-training.csv")
+pml_testing<- read_csv("pml-testing.csv")
+```
+
+##Features/Variables
+The outcome of our prediction is to classify how well each excercise was performed. This is given by the "classe" variable in the training set.
+
+The training dataset contains a total of 160 variables.  The data contains timestamp variables given by a sliding window approach with different lengths from 0.5 second to 2.5 seconds, with 0.5 second overlap. 
+
+In each step of the sliding window approach the dataset records the Euler angles (roll, pitch
+and yaw), as well as the raw accelerometer, gyroscope and magnetometer readings. There is also the total accelerometer and variance of the accelerometer readings. This accounts for 56 of the variables in the set. The model will be trained on these "raw" data readings. 
+
+In the training dataset, the Euler angles of each of the four sensors (belt, arm, forearm, and dumbell) eight features have also been calculated: mean, variance, standard deviation, max, min, amplitude, kurtosis and skewness, generating a further 96 derived features or variables. These variables are however not going to be used to train the model, since these derived or aggregated values are not given in the test data set, and insufficient raw data is given in the test dataset to derive these values. 
+
+##Tidying the dataset
+The training and testing data set were tidyied up, removing all NA values as well as eliminating the columns containing the aggregated or derived features described above.  Some additional columns were also removed such as those giving timestamp data, user name and index. These were not needed or helpful in building the prediction model. The tidying steps taken are given by the following R code:
+
+```{r results = "hide"}
+cols<-which(pml_training[1,]!="NA")
+cols<-as.data.frame(cols)
+cols<-as.vector(cols[8:60,])
+
+training1<-pml_training[,cols]
+#also apply to test set
+testing1<-pml_testing[,cols]
+
+#any more NAs?
+sapply(training1, function(x) sum(is.na(x)))
+#found 3 NAs still in the dataset. The row location for each:
+which(is.na(training1$magnet_dumbbell_z))
+which(is.na(training1$magnet_forearm_y))
+which(is.na(training1$magnet_forearm_z))
+#All 3 NAs are on same row, therefore eliminate this row 
+training1 <- training1[-5373, ]
+```
+
+##Spliting the data
+In order to cross validate our model, the testing dataset is partitioned into a sub-training and sub-testing set. Given no aggregated variables over each time window will be used, it is not necessary to consider time in the spliting of data. We are also not interested in the performance of each excercise as a function of time. Data is therefore simply split based on the "classe" variable of the training dataset.
+
+Based on data partition guidelines for prediction study design for a dataset of this size a split of 70% for sub-training and 30% for sub-testing was chosen.  The sub-testing set will be only be used once for an out of sample error calculataion.
+```{r warning = FALSE, message = F}
+# create train/test data sets
+library(caret)
+inTrain <- createDataPartition(y=pml_training$classe,p=0.7, list=FALSE)
+subtrain<- pml_training[inTrain,]
+subtest <- pml_training[-inTrain,]
+```
+
+#Training the models
+The sub-training set (subtrain) was used to build three different models using the caret package in R.  A simple classification tree, a boosted predictor using the boosted trees method and a random forest predictor. In each case the models relate the factor variable "classe" to the remaining variables. In the code given, method describes the type of model generated.  
+
+###Cross-Validaton
+Cross validation is applied within the train function to the random forest method.  The trainControl function applies a resampling method, with 3 folds, i.e. 3 resampling iterations.  This number was chosen as a conservative choice due to computational limitations when generating my results.
+
+```{r eval=FALSE}
+#Fit (1) a classification tree
+modelFit.rpart <- train(classe ~. , method="rpart",data=subtrain)
+
+# Fit (2) a boosted predictor using the boosted trees method "gbm": 
+modelFit.gbm <- train(classe~ .,data=subtrain, method="gbm",verbose=F)
+
+##Fit (3) a random forest predictor relating the factor variable "classe"
+#to the remaining variables:
+modelFit.rf <- train(classe ~.,method="rf",data=subtrain, trControl = trainControl(method="cv", number = 3), prox = T)
+
+```
+
+# Predicting the classe of bicep curls
+What are the accuracies for the three approaches on the test data set? Here we apply each of the models to the sub-testing (subtest) dataset to predict the classe variables. Then we construct a confusion matrix for each model to compare the predictions to the actual classe variables. This gives us an accuracy for each and their out of sample error can also be calculated.
+
+```{r eval=FALSE}
+# use the rpart, gbm and rf models to predict results on the validation data set
+rf.pred.test<- predict(modelFit.rf,subtest)
+gbm.pred.test<-predict(modelFit.gbm, subtest)
+rpart.pred.test<-predict(modelFit.rpart, subtest)
+#construct confusion matrix for each
+cM.rf<-confusionMatrix(subtest$classe, rf.pred.test) #0.9944
+cM.gbm<-confusionMatrix(subtest$classe, gbm.pred.test) #0.9672
+cM.rpart<-confusionMatrix(subtest$classe, rpart.pred.test) #0.4845
+
+#display the confusion matrix only for each model
+cM.rf$table
+cM.gbm$table
+cM.rpart$table
+
+#calculating the out of sample error (ose) for each model
+acc.rf <- sum(rf.pred.test == subtest$classe)/length(rf.pred.test)
+ose.rf<-(1-acc.rf)*100
+ose.rf
+
+acc.gbm <- sum(gbm.pred.test == subtest$classe)/length(gbm.pred.test)
+ose.gbm<-(1-acc.gbm)*100
+ose.gbm
+
+acc.rpart <- sum(rpart.pred.test == subtest$classe)/length(rpart.pred.test)
+ose.rpart<-(1-acc.rpart)*100
+ose.rpart
+```
+
+In running this code, the random forest model with cross validaton gave the highest accuracy of 99.44% and a corresponding lowest out of sample error of 0.56%.  The boosted tree (generalized boosted regression, gbm) method also gave a high accuracy of 96.72% and out of sample error of 3.28%.  Unsurprisingly the simple single classification tree method failed to generate good predictions with an accuracy of only 48.45% and a high out of sample error, 51.55%. Indeed when looking at the confusion matrix result the classification tree was unable to identify any bicep curls of classe D correctly.  
+
+#Conclusion
+The random tree method gave the best results and will therefore be used to predict classe variables for the 20 test cases given in the pml_testing dataset.
+
+##Predicting the 20 test cases
+The following code will be used to generate the predictions of the 20 test cases. These results will be submitted separately to the Course Project Prediction Quiz.
+```{r eval=FALSE}
+pred.testcases<-predict(modelFit.rf,testing1)
+```
+
+
+#Citation
+[1]     Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity         Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+Read more:<http://groupware.les.inf.puc-rio.br/har#ixzz58UbaMiVH>
