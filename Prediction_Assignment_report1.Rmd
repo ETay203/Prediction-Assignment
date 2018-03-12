@@ -20,7 +20,7 @@ The participents were asked to perform barbell lifts correctly and incorrectly i
 
 This report details how the prediction model was built, how cross validation was used, the expected out of sample error, and why various choices were made. 
 
-#Weight Lifting Exercises Dataset
+# Weight Lifting Exercises Dataset
 In this project we use the Weight Lifting Exercises dataset to build a model that predicts "how (well)" an activity was performed by the wearer. In other words we want to develop an automatic and robust detection of execution mistakes. This data records the measurements taken by on-body sensors.  
 Six participants were recorded perfoming one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification - i.e correctly (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
 
@@ -28,7 +28,7 @@ Class A corresponds to the specified execution of the exercise, while the other 
 
 More information about the data used in this project is available from the website: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset) and <http://groupware.les.inf.puc-rio.br/har#ixzz58UfXsime>. The original paper where the recording and application of this data is described is given in the citation at the end of this report [1].
 
-##Training and testing datasets
+## Training and testing datasets
 For this project the data has been given in two sets, a training set (pml_training.csv) and testing set (pml_testing.csv). The training data was used to build the model as well as for cross-validation and calculating the out of sample error.  The prediction model will then be used to predict 20 different test cases given in the testing set.
 
 The training data for this project are available here: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
@@ -51,7 +51,7 @@ and yaw), as well as the raw accelerometer, gyroscope and magnetometer readings.
 
 In the training dataset, the Euler angles of each of the four sensors (belt, arm, forearm, and dumbell) eight features have also been calculated: mean, variance, standard deviation, max, min, amplitude, kurtosis and skewness, generating a further 96 derived features or variables. These variables are however not going to be used to train the model, since these derived or aggregated values are not given in the test data set, and insufficient raw data is given in the test dataset to derive these values. 
 
-##Tidying the dataset
+## Tidying the dataset
 The training and testing data set were tidyied up, removing all NA values as well as eliminating the columns containing the aggregated or derived features described above.  Some additional columns were also removed such as those giving timestamp data, user name and index. These were not needed or helpful in building the prediction model. The tidying steps taken are given by the following R code:
 
 ```{r results = "hide"}
@@ -73,7 +73,7 @@ which(is.na(training1$magnet_forearm_z))
 training1 <- training1[-5373, ]
 ```
 
-##Spliting the data
+## Spliting the data
 In order to cross validate our model, the testing dataset is partitioned into a sub-training and sub-testing set. Given no aggregated variables over each time window will be used, it is not necessary to consider time in the spliting of data. We are also not interested in the performance of each excercise as a function of time. Data is therefore simply split based on the "classe" variable of the training dataset.
 
 Based on data partition guidelines for prediction study design for a dataset of this size a split of 70% for sub-training and 30% for sub-testing was chosen.  The sub-testing set will be only be used once for an out of sample error calculataion.
@@ -85,10 +85,10 @@ subtrain<- pml_training[inTrain,]
 subtest <- pml_training[-inTrain,]
 ```
 
-#Training the models
+# Training the models
 The sub-training set (subtrain) was used to build three different models using the caret package in R.  A simple classification tree, a boosted predictor using the boosted trees method and a random forest predictor. In each case the models relate the factor variable "classe" to the remaining variables. In the code given, method describes the type of model generated.  
 
-###Cross-Validaton
+### Cross-Validaton
 Cross validation is applied within the train function to the random forest method.  The trainControl function applies a resampling method, with 3 folds, i.e. 3 resampling iterations.  This number was chosen as a conservative choice due to computational limitations when generating my results.
 
 ```{r eval=FALSE}
